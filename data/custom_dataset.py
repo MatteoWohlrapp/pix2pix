@@ -29,7 +29,7 @@ class CustomDataset(BaseDataset):
     def modify_commandline_options(parser, is_train):
         """Add new dataset-specific options and rewrite default values for existing options."""
         parser.add_argument('--sampling_mask', type=str, default='radial', help='type of k-space sampling mask (radial or linear)')
-        parser.add_argument('--number_of_samples', type=int, default=10, help='number of samples to use (0 for all)')
+        parser.add_argument('--number_of_samples', type=int, default=None, help='number of samples to use (0 for all)')
         parser.add_argument('--seed', type=int, default=31415, help='random seed')
         parser.add_argument('--type', type=str, default='T2', help='type of MRI scan')
         parser.add_argument('--pathology', type=str, nargs='+', help='list of pathologies to include')
@@ -51,7 +51,7 @@ class CustomDataset(BaseDataset):
         self.data_root = pathlib.Path(opt.dataroot)
         
         # Set up dataset parameters from options
-        self.number_of_samples = opt.number_of_samples if hasattr(opt, 'number_of_samples') else 0
+        self.number_of_samples = opt.number_of_samples if hasattr(opt, 'number_of_samples') else None
         self.seed = opt.seed if hasattr(opt, 'seed') else 31415
         self.split = opt.phase  # use CycleGAN's phase (train/test) as split
         self.type = opt.type if hasattr(opt, 'type') else 'T2'
@@ -92,7 +92,7 @@ class CustomDataset(BaseDataset):
             df = df.filter(pl.col("split") == "val")
             
         # Sample if number_of_samples is specified
-        if self.number_of_samples > 0:
+        if self.number_of_samples is not None and self.number_of_samples > 0:
             df = df.sample(n=self.number_of_samples, seed=self.seed)
             
         return df
