@@ -1,6 +1,7 @@
 import os
 import pathlib
 from typing import Optional
+from skimage.transform import resize
 
 import fastmri
 import nibabel as nib
@@ -10,6 +11,14 @@ import torch
 from fastmri import fft2c, ifft2c
 from fastmri.data.subsample import RandomMaskFunc
 from data.base_dataset import BaseDataset, get_transform
+import torchvision.transforms as transforms
+def min_max_slice_normalization(scan: torch.Tensor) -> torch.Tensor:
+    scan_min = scan.min()
+    scan_max = scan.max()
+    if scan_max == scan_min:
+        return scan
+    normalized_scan = (scan - scan_min) / (scan_max - scan_min)
+    return normalized_scan
 
 class CustomDataset(BaseDataset):
     """Dataset for MRI reconstruction using CycleGAN.
@@ -20,7 +29,7 @@ class CustomDataset(BaseDataset):
     def modify_commandline_options(parser, is_train):
         """Add new dataset-specific options and rewrite default values for existing options."""
         parser.add_argument('--sampling_mask', type=str, default='radial', help='type of k-space sampling mask (radial or linear)')
-        parser.add_argument('--number_of_samples', type=int, default=0, help='number of samples to use (0 for all)')
+        parser.add_argument('--number_of_samples', type=int, default=10, help='number of samples to use (0 for all)')
         parser.add_argument('--seed', type=int, default=31415, help='random seed')
         parser.add_argument('--type', type=str, default='T2', help='type of MRI scan')
         parser.add_argument('--pathology', type=str, nargs='+', help='list of pathologies to include')
@@ -29,7 +38,7 @@ class CustomDataset(BaseDataset):
         parser.add_argument('--age_bins', type=float, nargs='+', default=[0, 68, 100], help='age bins for stratification')
         return parser
 
-    def __init__(self, opt):
+    def __init__(self, opt, train=True):
         """Initialize this dataset class.
         
         Parameters:
@@ -49,23 +58,23 @@ class CustomDataset(BaseDataset):
         self.pathology = opt.pathology if hasattr(opt, 'pathology') else None
         self.lower_slice = opt.lower_slice if hasattr(opt, 'lower_slice') else None
         self.upper_slice = opt.upper_slice if hasattr(opt, 'upper_slice') else None
-        self.age_bins = opt.age_bins if hasattr(opt, 'age_bins') else [0, 68, 100]
+        self.train = train
         
         # Load metadata
         self.metadata = self._load_metadata()
         
         # Set up transforms
-        self.transform = get_transform(opt)
+        self.transform = [min_max_slice_normalization, lambda x: transforms.functional.resize(x.unsqueeze(0), (256, 256)).squeeze(0)]
+        self.transform = transforms.Compose(self.transform)
 
     def _load_metadata(self):
-        """Load metadata for the dataset using the original format."""
-        # This should be implemented according to your metadata loading logic
-        # For example, if you have a CSV or parquet file with metadata:
-        metadata_file = self.data_root / f"{self.split}_metadata.parquet"
+        """Load metadata for the dataset from CSV file."""
+        # Load from CSV instead of parquet
+        metadata_file = self.data_root / "metadata.csv"
         if not metadata_file.exists():
             raise FileNotFoundError(f"Metadata file not found: {metadata_file}")
             
-        df = pl.read_parquet(metadata_file)
+        df = pl.read_csv(metadata_file)
         
         # Apply filters based on parameters
         if self.type:
@@ -76,6 +85,11 @@ class CustomDataset(BaseDataset):
             df = df.filter(pl.col("slice_id") >= self.lower_slice)
         if self.upper_slice is not None:
             df = df.filter(pl.col("slice_id") <= self.upper_slice)
+
+        if self.train:
+            df = df.filter(pl.col("split") == "train")
+        else:
+            df = df.filter(pl.col("split") == "val")
             
         # Sample if number_of_samples is specified
         if self.number_of_samples > 0:

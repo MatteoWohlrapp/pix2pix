@@ -112,7 +112,7 @@ class Visualizer():
         print('Command: %s' % cmd)
         Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
 
-    def display_current_results(self, visuals, epoch, save_result):
+    def display_current_results(self, visuals, total_iters, epoch, save_result, train_mode=True):
         """Display current results on visdom; save current results to an HTML file.
 
         Parameters:
@@ -181,11 +181,12 @@ class Visualizer():
                 wandb_image = wandb.Image(image_numpy)
                 table_row.append(wandb_image)
                 ims_dict[label] = wandb_image
-            self.wandb_run.log(ims_dict)
+            #self.wandb_run.log(ims_dict)
             if epoch != self.current_epoch:
                 self.current_epoch = epoch
                 result_table.add_data(*table_row)
-                self.wandb_run.log({"Result": result_table})
+                title = "Result" if train_mode else "Validation Result"
+                self.wandb_run.log({title: result_table}, step=total_iters)
 
         if self.use_html and (save_result or not self.saved):  # save images to an HTML file if they haven't been saved.
             self.saved = True
@@ -210,35 +211,56 @@ class Visualizer():
                 webpage.add_images(ims, txts, links, width=self.win_size)
             webpage.save()
 
-    def plot_current_losses(self, epoch, counter_ratio, losses):
+    def plot_current_losses(self, total_iters, losses, train_mode=True):
         """display the current losses on visdom display: dictionary of error labels and values
 
         Parameters:
             epoch (int)           -- current epoch
             counter_ratio (float) -- progress (percentage) in the current epoch, between 0 to 1
             losses (OrderedDict)  -- training losses stored in the format of (name, float) pairs
+            train_mode (bool)     -- whether these are training or validation losses
         """
-        if not hasattr(self, 'plot_data'):
-            self.plot_data = {'X': [], 'Y': [], 'legend': list(losses.keys())}
-        self.plot_data['X'].append(epoch + counter_ratio)
-        self.plot_data['Y'].append([losses[k] for k in self.plot_data['legend']])
+        # Initialize separate plot data for training and validation
+        if not hasattr(self, 'plot_data_train'):
+            self.plot_data_train = {'X': [], 'Y': [], 'legend': list(losses.keys())}
+        if not hasattr(self, 'plot_data_val'):
+            self.plot_data_val = {'X': [], 'Y': [], 'legend': list(losses.keys())}
+
+        # Select the appropriate plot data based on mode
+        plot_data = self.plot_data_train if train_mode else self.plot_data_val
+        
+        # Update the appropriate plot data
+        plot_data['X'].append(total_iters)
+        plot_data['Y'].append([losses[k] for k in plot_data['legend']])
+        
         try:
             self.vis.line(
-                X=np.stack([np.array(self.plot_data['X'])] * len(self.plot_data['legend']), 1),
-                Y=np.array(self.plot_data['Y']),
+                X=np.stack([np.array(plot_data['X'])] * len(plot_data['legend']), 1),
+                Y=np.array(plot_data['Y']),
                 opts={
-                    'title': self.name + ' loss over time',
-                    'legend': self.plot_data['legend'],
-                    'xlabel': 'epoch',
+                    'title': self.name + (' training' if train_mode else ' validation') + ' loss over time',
+                    'legend': plot_data['legend'],
+                    'xlabel': 'iteration' if train_mode else 'epoch',
                     'ylabel': 'loss'},
-                win=self.display_id)
+                win=self.display_id if train_mode else (self.display_id + 100))  # Different window IDs for train/val
         except VisdomExceptionBase:
             self.create_visdom_connections()
+        
         if self.use_wandb:
-            self.wandb_run.log(losses)
+            # Add debug print
+            print(f"Logging to wandb with step {total_iters}, losses: {losses}")
+            # Add prefix to distinguish between training and validation losses in wandb
+            if train_mode:
+                # Training metrics
+                prefixed_losses = {'train/' + k: v for k, v in losses.items()}
+                self.wandb_run.log(prefixed_losses, step=total_iters)
+            else:
+                # Validation metrics
+                prefixed_losses = {'val/' + k: v for k, v in losses.items()}
+                self.wandb_run.log(prefixed_losses, step=total_iters)  # Use same step counter for consistency
 
     # losses: same format as |losses| of plot_current_losses
-    def print_current_losses(self, epoch, iters, losses, t_comp, t_data):
+    def print_current_losses(self, epoch, iters, losses, t_comp, t_data, train_mode=True):
         """print current losses on console; also save the losses to the disk
 
         Parameters:
@@ -248,7 +270,11 @@ class Visualizer():
             t_comp (float) -- computational time per data point (normalized by batch_size)
             t_data (float) -- data loading time per data point (normalized by batch_size)
         """
-        message = '(epoch: %d, iters: %d, time: %.3f, data: %.3f) ' % (epoch, iters, t_comp, t_data)
+        if not train_mode:
+            message = 'validation: '
+        else:
+            message = ''   
+        message = message + '(epoch: %d, iters: %d, time: %.3f, data: %.3f) ' % (epoch, iters, t_comp, t_data)
         for k, v in losses.items():
             message += '%s: %.3f ' % (k, v)
 
