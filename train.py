@@ -24,10 +24,13 @@ from data import create_dataset
 from models import create_model
 import wandb
 import torch
+import os
 
 if __name__ == '__main__':
+    gpu_id = int(os.environ.get('CUDA_VISIBLE_DEVICES', 0))
+    # Make this GPU appear as GPU 0 to PyTorch
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
     opt = TrainOptions().parse()   # get training options
-    
     # Initialize wandb
     if opt.use_wandb:
         wandb.init(
@@ -112,6 +115,9 @@ if __name__ == '__main__':
                     model.compute_visuals()
                     visuals = model.get_current_visuals()
                     for label, image in visuals.items():
+                        if len(image.shape) == 4:  # If batch dimension exists
+                            n_images = min(image.shape[0], 5)
+                            image = image[:n_images]
                         wandb.log({f"train_images/{label}": wandb.Image(image)}, 
                                 step=total_iters)
 
@@ -143,6 +149,9 @@ if __name__ == '__main__':
                     model.compute_visuals()
                     visuals = model.get_current_visuals()
                     for label, image in visuals.items():
+                        if len(image.shape) == 4:  # If batch dimension exists
+                            n_images = min(image.shape[0], 5)
+                            image = image[:n_images]
                         wandb.log({f"val_images/{label}": wandb.Image(image)}, 
                                 step=total_iters)
             

@@ -31,10 +31,10 @@ class CustomDataset(BaseDataset):
         parser.add_argument('--sampling_mask', type=str, default='radial', help='type of k-space sampling mask (radial or linear)')
         parser.add_argument('--number_of_samples', type=int, default=None, help='number of samples to use (0 for all)')
         parser.add_argument('--seed', type=int, default=31415, help='random seed')
-        parser.add_argument('--type', type=str, default='T2', help='type of MRI scan')
+        parser.add_argument('--type', type=str, default='FLAIR', help='type of MRI scan')
         parser.add_argument('--pathology', type=str, nargs='+', help='list of pathologies to include')
-        parser.add_argument('--lower_slice', type=int, help='lower slice index bound')
-        parser.add_argument('--upper_slice', type=int, help='upper slice index bound')
+        parser.add_argument('--lower_slice', type=int, default=60, help='lower slice index bound')
+        parser.add_argument('--upper_slice', type=int, default=130, help='upper slice index bound')
         parser.add_argument('--age_bins', type=float, nargs='+', default=[0, 68, 100], help='age bins for stratification')
         return parser
 
