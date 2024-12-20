@@ -20,7 +20,7 @@ def min_max_slice_normalization(scan: torch.Tensor) -> torch.Tensor:
     normalized_scan = (scan - scan_min) / (scan_max - scan_min)
     return normalized_scan
 
-class CustomDataset(BaseDataset):
+class UcsfDataset(BaseDataset):
     """Dataset for MRI reconstruction using CycleGAN.
     Domain A: Undersampled MRI images
     Domain B: Fully sampled MRI images
