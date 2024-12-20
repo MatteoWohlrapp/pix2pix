@@ -20,4 +20,4 @@ conda activate pix
 
 cd "/vol/aimspace/projects/practical_SoSe24/mri_inr/matteo/code/pix2pix"
 
-python train.py --dataroot ../../data/UCSF-PDGM/ --name pix2pix-test --model pix2pix --dataset_mode custom --direction BtoA --display_freq 400 --print_freq 400 --input_nc 1 --output_nc 1 --use_wandb --val_dataroot ../../data/UCSF-PDGM/ --batch_size 200 --number_of_samples 800 --gpu_ids 0
+python train.py --dataroot ../../data/UCSF-PDGM/ --name pix2pix-test --model pix2pix --dataset_mode custom --direction BtoA --display_freq 10000 --print_freq 10000 --input_nc 1 --output_nc 1 --use_wandb --val_dataroot ../../data/UCSF-PDGM/ --batch_size 400 --gpu_ids 0
