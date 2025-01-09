@@ -35,6 +35,7 @@ class ChexDataset(BaseDataset):
         self.seed = opt.seed if hasattr(opt, 'seed') else 31415
         self.split = opt.phase
         self.photon_count = opt.photon_count if hasattr(opt, 'photon_count') else 1e5
+        print(f"Using {self.photon_count} photons")
         self.train = train
         
         # Load metadata
@@ -79,35 +80,35 @@ class ChexDataset(BaseDataset):
         filter_profile = np.concatenate([profile[::-1], profile])[:cols]
         return sinogram * filter_profile[np.newaxis, :]
 
-    def process_image(self, image: np.ndarray) -> np.ndarray:
+    def process_image(self, image: np.ndarray) -> tuple:
         """
-        Process the X-ray image through the pipeline:
-        Radon transform -> bowtie filter -> noise -> inverse Radon transform.
-
+        Process the X-ray image with controllable noise levels.
+        
         Parameters:
-        - image: 2D numpy array of the original image.
-
+        - image: 2D numpy array of the original image
+        - photon_count: Number of photons (lower = more noise)
+        
         Returns:
-        - reconstructed_image: Reconstructed image after processing.
+        - reconstructed_image: Reconstructed image after processing
+        - metrics: Dictionary with noise metrics
         """
-        # Step 2: Forward projection (Radon transform)
+        # Normalize input image to [0,1] range
+        image = (image - np.min(image)) / (np.max(image) - np.min(image))
+        
+        # Steps 2-5: Same as before
         theta = np.linspace(0., 180., max(image.shape), endpoint=False)
         sinogram = radon(image, theta=theta, circle=False)
-
-        # Step 3: Apply bowtie filter
         filtered_sinogram = self.apply_bowtie_filter(sinogram)
+        
+        max_val = np.max(filtered_sinogram)
+        scaled_sinogram = (filtered_sinogram / max_val) * self.photon_count
+        noisy_sinogram = np.random.poisson(scaled_sinogram).astype(float)
+        noisy_sinogram = (noisy_sinogram / self.photon_count) * max_val
 
-        # Step 4: Add dose-dependent Poisson noise
-        scaled_sinogram = filtered_sinogram * self.photon_count
-        noisy_sinogram = np.random.poisson(scaled_sinogram) / self.photon_count
-
-        # Step 5: Reconstruct the noisy image (inverse Radon transform)
         reconstructed_padded_image = iradon(noisy_sinogram, theta=theta, filter_name='hann', circle=False)
-
-        # Step 6: Resize the reconstructed image to match original dimensions
         reconstructed_image = resize(reconstructed_padded_image, image.shape, mode='reflect', anti_aliasing=True)
-
-        # Normalize and rescale intensities
+        
+        # Normalize reconstructed image to [0,1] range
         reconstructed_image = (reconstructed_image - np.min(reconstructed_image)) / (np.max(reconstructed_image) - np.min(reconstructed_image))
 
         return reconstructed_image
