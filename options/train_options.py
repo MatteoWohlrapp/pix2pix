@@ -38,6 +38,8 @@ class TrainOptions(BaseOptions):
         # Add validation options
         parser.add_argument('--val_freq', type=int, default=1, help='frequency of validation (epochs)')
         parser.add_argument('--val_dataroot', type=str, help='path to validation dataset')
+        parser.add_argument('--leaky_relu_alpha_G', type=float, default=0.2, help='alpha for leaky ReLU in generator')
+        parser.add_argument('--leaky_relu_alpha_D', type=float, default=0.2, help='alpha for leaky ReLU in discriminator')
 
         self.isTrain = True
         return parser

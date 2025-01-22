@@ -117,7 +117,7 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     return net
 
 
-def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=[]):
+def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=[], leaky_relu_alpha=0.2):
     """Create a generator
 
     Parameters:
@@ -154,15 +154,15 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6)
     elif netG == 'unet_128':
         print("Using unet_128")
-        net = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+        net = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_dropout=use_dropout, leaky_relu_alpha=leaky_relu_alpha)
     elif netG == 'unet_256':
-        net = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+        net = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm_layer, use_dropout=use_dropout, leaky_relu_alpha=leaky_relu_alpha)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
     return init_net(net, init_type, init_gain, gpu_ids)
 
 
-def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal', init_gain=0.02, gpu_ids=[]):
+def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal', init_gain=0.02, gpu_ids=[], leaky_relu_alpha=0.2):
     """Create a discriminator
 
     Parameters:
@@ -196,11 +196,11 @@ def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal'
     norm_layer = get_norm_layer(norm_type=norm)
 
     if netD == 'basic':  # default PatchGAN classifier
-        net = NLayerDiscriminator(input_nc, ndf, n_layers=3, norm_layer=norm_layer)
+        net = NLayerDiscriminator(input_nc, ndf, n_layers=3, norm_layer=norm_layer, leaky_relu_alpha=leaky_relu_alpha)
     elif netD == 'n_layers':  # more options
-        net = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer)
+        net = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer, leaky_relu_alpha=leaky_relu_alpha)
     elif netD == 'pixel':     # classify if each pixel is real or fake
-        net = PixelDiscriminator(input_nc, ndf, norm_layer=norm_layer)
+        net = PixelDiscriminator(input_nc, ndf, norm_layer=norm_layer, leaky_relu_alpha=leaky_relu_alpha)
     else:
         raise NotImplementedError('Discriminator model name [%s] is not recognized' % netD)
     return init_net(net, init_type, init_gain, gpu_ids)
@@ -439,7 +439,7 @@ class ResnetBlock(nn.Module):
 class UnetGenerator(nn.Module):
     """Create a Unet-based generator"""
 
-    def __init__(self, input_nc, output_nc, num_downs, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False):
+    def __init__(self, input_nc, output_nc, num_downs, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, leaky_relu_alpha=0.2):
         """Construct a Unet generator
         Parameters:
             input_nc (int)  -- the number of channels in input images
@@ -456,12 +456,12 @@ class UnetGenerator(nn.Module):
         # construct unet structure
         unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=None, norm_layer=norm_layer, innermost=True)  # add the innermost layer
         for i in range(num_downs - 5):          # add intermediate layers with ngf * 8 filters
-            unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout)
+            unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout, leaky_relu_alpha=leaky_relu_alpha)
         # gradually reduce the number of filters from ngf * 8 to ngf
-        unet_block = UnetSkipConnectionBlock(ngf * 4, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
-        unet_block = UnetSkipConnectionBlock(ngf * 2, ngf * 4, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
-        unet_block = UnetSkipConnectionBlock(ngf, ngf * 2, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
-        self.model = UnetSkipConnectionBlock(output_nc, ngf, input_nc=input_nc, submodule=unet_block, outermost=True, norm_layer=norm_layer)  # add the outermost layer
+        unet_block = UnetSkipConnectionBlock(ngf * 4, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, leaky_relu_alpha=leaky_relu_alpha)
+        unet_block = UnetSkipConnectionBlock(ngf * 2, ngf * 4, input_nc=None, submodule=unet_block, norm_layer=norm_layer, leaky_relu_alpha=leaky_relu_alpha)
+        unet_block = UnetSkipConnectionBlock(ngf, ngf * 2, input_nc=None, submodule=unet_block, norm_layer=norm_layer, leaky_relu_alpha=leaky_relu_alpha)
+        self.model = UnetSkipConnectionBlock(output_nc, ngf, input_nc=input_nc, submodule=unet_block, outermost=True, norm_layer=norm_layer, leaky_relu_alpha=leaky_relu_alpha)  # add the outermost layer
 
     def forward(self, input):
         """Standard forward"""
@@ -475,7 +475,7 @@ class UnetSkipConnectionBlock(nn.Module):
     """
 
     def __init__(self, outer_nc, inner_nc, input_nc=None,
-                 submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False):
+                 submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False, leaky_relu_alpha=0.2):
         """Construct a Unet submodule with skip connections.
 
         Parameters:
@@ -498,7 +498,7 @@ class UnetSkipConnectionBlock(nn.Module):
             input_nc = outer_nc
         downconv = nn.Conv2d(input_nc, inner_nc, kernel_size=4,
                              stride=2, padding=1, bias=use_bias)
-        downrelu = nn.LeakyReLU(0.2, True)
+        downrelu = nn.LeakyReLU(leaky_relu_alpha, True)
         downnorm = norm_layer(inner_nc)
         uprelu = nn.ReLU(True)
         upnorm = norm_layer(outer_nc)
@@ -541,7 +541,7 @@ class UnetSkipConnectionBlock(nn.Module):
 class NLayerDiscriminator(nn.Module):
     """Defines a PatchGAN discriminator"""
 
-    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d):
+    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, leaky_relu_alpha=0.2):
         """Construct a PatchGAN discriminator
 
         Parameters:
@@ -558,7 +558,7 @@ class NLayerDiscriminator(nn.Module):
 
         kw = 4
         padw = 1
-        sequence = [nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw), nn.LeakyReLU(0.2, True)]
+        sequence = [nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw), nn.LeakyReLU(leaky_relu_alpha, True)]
         nf_mult = 1
         nf_mult_prev = 1
         for n in range(1, n_layers):  # gradually increase the number of filters
@@ -567,7 +567,7 @@ class NLayerDiscriminator(nn.Module):
             sequence += [
                 nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=2, padding=padw, bias=use_bias),
                 norm_layer(ndf * nf_mult),
-                nn.LeakyReLU(0.2, True)
+                nn.LeakyReLU(leaky_relu_alpha, True)
             ]
 
         nf_mult_prev = nf_mult
@@ -575,7 +575,7 @@ class NLayerDiscriminator(nn.Module):
         sequence += [
             nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
             norm_layer(ndf * nf_mult),
-            nn.LeakyReLU(0.2, True)
+            nn.LeakyReLU(leaky_relu_alpha, True)
         ]
 
         sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]  # output 1 channel prediction map
@@ -589,7 +589,7 @@ class NLayerDiscriminator(nn.Module):
 class PixelDiscriminator(nn.Module):
     """Defines a 1x1 PatchGAN discriminator (pixelGAN)"""
 
-    def __init__(self, input_nc, ndf=64, norm_layer=nn.BatchNorm2d):
+    def __init__(self, input_nc, ndf=64, norm_layer=nn.BatchNorm2d, leaky_relu_alpha=0.2):
         """Construct a 1x1 PatchGAN discriminator
 
         Parameters:
@@ -605,10 +605,10 @@ class PixelDiscriminator(nn.Module):
 
         self.net = [
             nn.Conv2d(input_nc, ndf, kernel_size=1, stride=1, padding=0),
-            nn.LeakyReLU(0.2, True),
+            nn.LeakyReLU(leaky_relu_alpha, True),
             nn.Conv2d(ndf, ndf * 2, kernel_size=1, stride=1, padding=0, bias=use_bias),
             norm_layer(ndf * 2),
-            nn.LeakyReLU(0.2, True),
+            nn.LeakyReLU(leaky_relu_alpha, True),
             nn.Conv2d(ndf * 2, 1, kernel_size=1, stride=1, padding=0, bias=use_bias)]
 
         self.net = nn.Sequential(*self.net)
