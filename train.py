@@ -59,14 +59,9 @@ if __name__ == '__main__':
     print('The number of training images = %d' % dataset_size)
 
     # Create validation dataset if val_dataroot is provided
-    if opt.val_dataroot:
-        train_dataroot = opt.dataroot
-        opt.dataroot = opt.val_dataroot
-        opt.phase = 'val'
+    if opt.val:
         val_dataset = create_dataset(opt, train=False)
         print('The number of validation images = %d' % len(val_dataset))
-        opt.dataroot = train_dataroot
-        opt.phase = 'train'
 
     model = create_model(opt)
     model.setup(opt)
@@ -128,7 +123,7 @@ if __name__ == '__main__':
             iter_data_time = time.time()
 
         # Validation step
-        if opt.val_dataroot and epoch % opt.val_freq == 0:
+        if opt.val and epoch % opt.val_freq == 0:
             model.eval()
             val_losses = {}
             val_iter = 0
