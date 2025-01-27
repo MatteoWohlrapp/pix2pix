@@ -2,8 +2,8 @@
 
 #SBATCH -J "mri_inr"   # job name
 #SBATCH --time=4-00:00:00   # walltime
-#SBATCH --output=/vol/aimspace/projects/practical_SoSe24/mri_inr/matteo/logs/train_%A.out  # Standard output of the script (Can be absolute or relative path)
-#SBATCH --error=/vol/aimspace/projects/practical_SoSe24/mri_inr/matteo/logs/train_%A.err  # Standard error of the script
+#SBATCH --output=/vol/miltank/projects/practical_SoSe24/mri_inr/matteo/logs/train_%A.out  # Standard output of the script (Can be absolute or relative path)
+#SBATCH --error=/vol/miltank/projects/practical_SoSe24/mri_inr/matteo/logs/train_%A.err  # Standard error of the script
 #SBATCH --mem=64G
 #SBATCH --nodes=1   # number of nodes
 #SBATCH --ntasks-per-node=1
@@ -18,6 +18,6 @@
 conda deactivate
 conda activate pix
 
-cd "/vol/aimspace/projects/practical_SoSe24/mri_inr/matteo/code/pix2pix"
+cd "/vol/miltank/projects/practical_SoSe24/mri_inr/matteo/code/pix2pix"
 
-python train.py --dataroot_B /vol/miltank/datasets/CheXpert --csv_path_B /vol/aimspace/projects/practical_SoSe24/mri_inr/matteo/data/CheXpert/chex-metadata.csv --dataroot_A /vol/aimspace/projects/practical_SoSe24/mri_inr/matteo/data/CheXpert_noisy --csv_path_A /vol/aimspace/projects/practical_SoSe24/mri_inr/matteo/data/CheXpert_noisy/chex-metadata_photon_100000.csv --name pix2pix-chex100000-128-pixel --model pix2pix --dataset_mode chex --direction AtoB --display_freq 250 --print_freq 250 --input_nc 1 --output_nc 1 --use_wandb --batch_size 64 --gpu_ids 0 --netG unet_128 --num_threads 16 --netD basic --val --beta1 0.75 --lr 0.0002
+python train.py --dataroot_B /vol/miltank/datasets/CheXpert --csv_path_B /vol/miltank/projects/practical_SoSe24/mri_inr/matteo/data/CheXpert/chex-metadata.csv --dataroot_A /vol/miltank/projects/practical_SoSe24/mri_inr/matteo/data/CheXpert_noisy --csv_path_A /vol/miltank/projects/practical_SoSe24/mri_inr/matteo/data/CheXpert_noisy/chex-metadata_photon_10000.csv --name pix2pix-chex10000-128-l1000 --model pix2pix --dataset_mode chex --direction AtoB --display_freq 250 --print_freq 250 --input_nc 1 --output_nc 1 --use_wandb --batch_size 64 --gpu_ids 0 --netG unet_128 --num_threads 16 --netD basic --val --lambda_L1 1000
