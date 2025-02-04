@@ -25,6 +25,9 @@ from models import create_model
 import wandb
 import torch
 import os
+from models.networks import UnetGenerator
+from models.fairness_loss import FairnessLoss
+from tqdm import tqdm
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
@@ -63,15 +66,34 @@ if __name__ == '__main__':
         print('The number of validation images = %d' % len(val_dataset))
 
     model = create_model(opt)
+    state_dict = torch.load(opt.model_g_path, map_location=torch.device(model.device))
+    fixed_state_dict = {'module.' + k: v for k, v in state_dict.items()}
+    model.netG.load_state_dict(fixed_state_dict)
+
+    state_dict = torch.load(opt.model_d_path, map_location=torch.device(model.device))
+    fixed_state_dict = {'module.' + k: v for k, v in state_dict.items()}
+    model.netD.load_state_dict(fixed_state_dict)
+
     model.setup(opt)
     total_iters = 0
+
+    classifier = torch.load(opt.classifier_path, map_location=torch.device(model.device))
+    fairness_loss = FairnessLoss(classifier)
+
+    model.fairness_loss = fairness_loss
 
     for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
         epoch_start_time = time.time()
         iter_data_time = time.time()
         epoch_iter = 0
         
-        for i, data in enumerate(dataset):
+        # Create progress bar for the epoch
+        pbar = tqdm(enumerate(dataset), 
+                   total=len(dataset)//opt.batch_size,
+                   desc=f'Epoch {epoch}/{opt.n_epochs + opt.n_epochs_decay}',
+                   leave=True)
+        
+        for i, data in pbar:
             iter_start_time = time.time()
             if total_iters % opt.print_freq == 0:
                 t_data = iter_start_time - iter_data_time
@@ -120,6 +142,10 @@ if __name__ == '__main__':
                 model.save_networks('latest')
 
             iter_data_time = time.time()
+
+            # Update progress bar description with losses if needed
+            if total_iters % opt.print_freq == 0:
+                pbar.set_postfix({k: f'{v:.3f}' for k, v in losses.items()})
 
         # Validation step
         if opt.val and epoch % opt.val_freq == 0:

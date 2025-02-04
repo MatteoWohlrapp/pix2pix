@@ -57,6 +57,10 @@ class BaseOptions():
         # wandb parameters
         parser.add_argument('--use_wandb', action='store_true', help='if specified, then init wandb logging')
         parser.add_argument('--wandb_project_name', type=str, default='CycleGAN-and-pix2pix', help='specify wandb project name')
+
+        parser.add_argument('--model_g_path', type=str, default='', help='path to model')
+        parser.add_argument('--model_d_path', type=str, default='', help='path to model')
+        parser.add_argument('--classifier_path', type=str, default='', help='path to classifier')
         self.initialized = True
         return parser
 
