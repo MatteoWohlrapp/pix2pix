@@ -104,7 +104,7 @@ class UcsfDataset(BaseDataset):
         )
         return complex_tensor
 
-    def create_radial_mask(self, shape, num_rays=22):
+    def create_radial_mask(self, shape, num_rays=140):
         """Create a radial mask for undersampling k-space."""
         H, W = shape
         center = (H // 2, W // 2)
