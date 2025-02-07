@@ -7,9 +7,10 @@
 #SBATCH --mem=64G
 #SBATCH --nodes=1   # number of nodes
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=16   # number of processor cores (i.e. tasks)
+#SBATCH --cpus-per-task=32   # number of processor cores (i.e. tasks)
 #SBATCH --qos=master-queuesave
 #SBATCH --gres=gpu:A100:1              # Request 1 specific GPU (e.g., A100)
+#SBATCH --nodelist=apollo,hercules
 
 # load python module
 . "/opt/anaconda3/etc/profile.d/conda.sh"
@@ -20,4 +21,4 @@ conda activate pix
 
 cd "/vol/miltank/projects/practical_SoSe24/mri_inr/matteo/code/pix2pix"
 
-python train.py --dataroot_B /vol/miltank/datasets/CheXpert --csv_path_B /vol/miltank/projects/practical_SoSe24/mri_inr/matteo/data/CheXpert/chex-metadata.csv --dataroot_A /vol/miltank/projects/practical_SoSe24/mri_inr/matteo/data/CheXpert_noisy --csv_path_A /vol/miltank/projects/practical_SoSe24/mri_inr/matteo/data/CheXpert_noisy/chex-metadata_photon_10000.csv --name pix2pix-chex10000-128-l1000 --model pix2pix --dataset_mode chex --direction AtoB --display_freq 250 --print_freq 250 --input_nc 1 --output_nc 1 --use_wandb --batch_size 64 --gpu_ids 0 --netG unet_128 --num_threads 16 --netD basic --val --lambda_L1 1000
+python train.py --dataroot_B /vol/miltank/datasets/CheXpert --csv_path_B /vol/miltank/projects/practical_SoSe24/mri_inr/matteo/data/CheXpert/chex-metadata.csv --dataroot_A /vol/miltank/projects/practical_SoSe24/mri_inr/matteo/data/CheXpert_noisy --csv_path_A /vol/miltank/projects/practical_SoSe24/mri_inr/matteo/data/CheXpert_noisy/chex-metadata_photon_3000.csv --name pix2pix-chex3000-128-l1000 --model pix2pix --dataset_mode chex --direction AtoB --display_freq 250 --print_freq 250 --input_nc 1 --output_nc 1 --use_wandb --batch_size 64 --gpu_ids 0 --netG unet_128 --num_threads 16 --netD basic --val --lambda_L1 1000
