@@ -77,8 +77,8 @@ class ChexDataset(BaseDataset):
             df_A = df_A[df_A["split"] == "val_recon"]
             df_B = df_B[df_B["split"] == "val_recon"]
         else:
-            df_A = df_A[df_A["split"] == "train_recon"]
-            df_B = df_B[df_B["split"] == "train_recon"]
+            df_A = df_A[df_A["split"] == "val_class"]
+            df_B = df_B[df_B["split"] == "val_class"]
             
         if self.number_of_samples is not None and self.number_of_samples > 0:
             df_A = df_A.sample(n=self.number_of_samples, random_state=self.seed)

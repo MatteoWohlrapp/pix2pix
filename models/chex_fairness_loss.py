@@ -3,7 +3,7 @@ import torch.nn as nn
 from sklearn.metrics import roc_curve
 import numpy as np
 
-class FairnessLoss(nn.Module):
+class ChexFairnessLoss(nn.Module):
     def __init__(self, classifier, momentum=0.1):
         """
         Initialize the fairness loss module.
@@ -12,14 +12,11 @@ class FairnessLoss(nn.Module):
             classifier: Pre-trained classifier model
             momentum: Momentum for updating running threshold (default: 0.1)
         """
-        super(FairnessLoss, self).__init__()
+        super(ChexFairnessLoss, self).__init__()
         self.classifier = classifier
-        self.classifier.eval()  # Set to evaluation mode
-        for param in self.classifier.parameters():
-            param.requires_grad = False  # Freeze classifier parameters
         self.threshold = 0.5  # Initial threshold
         self.momentum = momentum
-            
+
     def update_threshold(self, pred_probs, labels):
         """
         Update running threshold using current batch with momentum.
@@ -57,7 +54,7 @@ class FairnessLoss(nn.Module):
         Returns:
             Dictionary of rates for each group
         """
-        group_rates = {}
+        group_rates = []
         
         # Binary predictions using current threshold
         predictions = (pred_probs >= self.threshold).float()
@@ -78,15 +75,10 @@ class FairnessLoss(nn.Module):
                 continue
                 
             # Calculate rates
-            pred_rate = predictions[group_mask].mean() if group_mask.sum() > 0 else torch.tensor(0.0, device=pred_probs.device)
             tpr = predictions[pos_mask].mean() if pos_mask.sum() > 0 else torch.tensor(0.0, device=pred_probs.device)
             fpr = predictions[neg_mask].mean() if neg_mask.sum() > 0 else torch.tensor(0.0, device=pred_probs.device)
             
-            group_rates[value.item()] = {
-                'pred_rate': pred_rate,
-                'tpr': tpr,
-                'fpr': fpr
-            }
+            group_rates.append({'tpr': tpr, 'fpr': fpr})
             
         return group_rates
     
@@ -124,8 +116,8 @@ class FairnessLoss(nn.Module):
                 continue
                 
             # Calculate max difference in TPR and FPR across all pairs
-            tpr_values = torch.tensor([rates['tpr'] for rates in group_rates.values()])
-            fpr_values = torch.tensor([rates['fpr'] for rates in group_rates.values()])
+            tpr_values = torch.tensor([rates['tpr'] for rates in group_rates])
+            fpr_values = torch.tensor([rates['fpr'] for rates in group_rates])
             
             tpr_diff = torch.max(tpr_values) - torch.min(tpr_values)
             fpr_diff = torch.max(fpr_values) - torch.min(fpr_values)

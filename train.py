@@ -26,7 +26,7 @@ import wandb
 import torch
 import os
 from models.networks import UnetGenerator
-from models.fairness_loss import FairnessLoss
+from models.chex_fairness_loss import ChexFairnessLoss
 from tqdm import tqdm
 
 if __name__ == '__main__':
@@ -78,9 +78,11 @@ if __name__ == '__main__':
     total_iters = 0
 
     classifier = torch.load(opt.classifier_path, map_location=torch.device(model.device))
-    fairness_loss = FairnessLoss(classifier)
+    fairness_loss = ChexFairnessLoss(classifier)
+    fairness_loss.to(model.device)
 
     model.fairness_loss = fairness_loss
+    model.lambda_fairness = opt.lambda_fairness
 
     for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
         epoch_start_time = time.time()

@@ -61,6 +61,7 @@ class BaseOptions():
         parser.add_argument('--model_g_path', type=str, default='', help='path to model')
         parser.add_argument('--model_d_path', type=str, default='', help='path to model')
         parser.add_argument('--classifier_path', type=str, default='', help='path to classifier')
+        parser.add_argument('--lambda_fairness', type=float, default=0.001, help='lambda for fairness loss')
         self.initialized = True
         return parser
 
