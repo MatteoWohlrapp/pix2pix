@@ -27,10 +27,9 @@ import torch
 import os
 
 if __name__ == '__main__':
-    gpu_id = int(os.environ.get('CUDA_VISIBLE_DEVICES', 0))
-    # Make this GPU appear as GPU 0 to PyTorch
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
     opt = TrainOptions().parse()   # get training options
+    gpu_ids = opt.gpu_ids
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_ids[0])
     # Initialize wandb
     if opt.use_wandb:
         wandb.init(
