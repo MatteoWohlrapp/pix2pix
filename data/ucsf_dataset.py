@@ -54,7 +54,7 @@ class UcsfDataset(BaseDataset):
         self.number_of_samples = opt.number_of_samples if hasattr(opt, 'number_of_samples') else None
         self.seed = opt.seed if hasattr(opt, 'seed') else 31415
         self.split = opt.phase  # use CycleGAN's phase (train/test) as split
-        self.type = opt.type if hasattr(opt, 'type') else 'T2'
+        self.type = opt.type if hasattr(opt, 'type') else 'FLAIR'
         self.pathology = opt.pathology if hasattr(opt, 'pathology') else None
         self.lower_slice = opt.lower_slice if hasattr(opt, 'lower_slice') else None
         self.upper_slice = opt.upper_slice if hasattr(opt, 'upper_slice') else None
@@ -87,9 +87,11 @@ class UcsfDataset(BaseDataset):
             df = df.filter(pl.col("slice_id") <= self.upper_slice)
 
         if self.train:
-            df = df.filter(pl.col("split") == "train")
-        else:
             df = df.filter(pl.col("split") == "val")
+        else:
+            df = df.filter(pl.col("split") == "train")
+            # select 10000 samples
+            df = df.sample(n=10000, seed=self.seed)
             
         # Sample if number_of_samples is specified
         if self.number_of_samples is not None and self.number_of_samples > 0:
@@ -174,13 +176,21 @@ class UcsfDataset(BaseDataset):
         # Prepare for CycleGAN (both need to be 3D tensors: C×H×W)
         slice_tensor = slice_tensor.unsqueeze(0)
         undersampled_tensor = undersampled_tensor.unsqueeze(0)
+
+        sex = float(0 if row["sex"] == "F" else 1)
+        age = float(row["age_at_mri"] <= 58)
+
+        grade = float(0 if int(row["who_cns_grade"]) <= 3 else 1)
+        type = float(1 if row["final_diagnosis"] == "Glioblastoma, IDH-wildtype" else 0)
         
         # Return in CycleGAN format but using your file paths
         return {
             'A': undersampled_tensor,  # undersampled image
             'B': slice_tensor,         # fully sampled image
             'A_paths': str(row["file_path"]),
-            'B_paths': str(row["file_path"])
+            'B_paths': str(row["file_path"]),
+            'labels': torch.tensor([grade, type]),
+            'protected_attrs': torch.tensor([sex, age])
         }
 
     def __len__(self):

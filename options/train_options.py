@@ -41,6 +41,9 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--val', action='store_true', help='perform validation')
         parser.add_argument('--leaky_relu_alpha_G', type=float, default=0.2, help='alpha for leaky ReLU in generator')
         parser.add_argument('--leaky_relu_alpha_D', type=float, default=0.2, help='alpha for leaky ReLU in discriminator')
+        parser.add_argument('--tum', action='store_true', help='perform validation')
+
+        parser.add_argument('--fairness_lambda', type=float, default=10, help='lambda for fairness loss')
 
         self.isTrain = True
         return parser
