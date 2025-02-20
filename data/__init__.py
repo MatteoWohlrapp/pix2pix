@@ -72,11 +72,13 @@ class CustomDatasetDataLoader():
         dataset_class = find_dataset_using_name(opt.dataset_mode)
         self.dataset = dataset_class(opt, train=train)
         print("dataset [%s] was created" % type(self.dataset).__name__)
+        weights = self.dataset.compute_sample_weights()
         self.dataloader = torch.utils.data.DataLoader(
             self.dataset,
             batch_size=opt.batch_size,
-            shuffle=not opt.serial_batches,
-            num_workers=int(opt.num_threads))
+            shuffle=False,
+            num_workers=int(opt.num_threads),
+            sampler=WeightedRandomSampler(weights, len(weights), replacement=True))
 
     def load_data(self):
         return self
