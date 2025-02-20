@@ -26,8 +26,46 @@ import wandb
 import torch
 import os
 from models.networks import UnetGenerator
-from models.chex_fairness_loss import ChexFairnessLoss
+from fairness.fairness_loss import FairnessLoss
 from tqdm import tqdm
+from fairness.classification_model import TGradeBCEClassifier, TTypeBCEClassifier
+from fairness.resnet_classification_network import ResNetClassifierNetwork
+
+
+def load_classifier_models(dataset_mode, tum, device):
+    if dataset_mode == "chex":
+        classifier_path = "" if tum else "/lotterlab/users/matteo/code/torchxrayvision/output/class_norm01/chex-densenet-class_norm01-best.pt"
+        classifier = torch.load(classifier_path, map_location=device)
+        for param in classifier.parameters():
+            param.requires_grad = False
+        return classifier
+    elif dataset_mode == "ucsf":
+        ttype_path = "" if tum else "/lotterlab/users/matteo/models/ttype/checkpoints/ttype_test_20240925_113544_epoch_1_best.pth"
+        tgrade_path = "" if tum else "/lotterlab/users/matteo/models/tgrade/checkpoints/tgrade_test_20240925_113550_epoch_1_best.pth"
+        paths = {"TGradeBCEClassifier": tgrade_path, "TTypeBCEClassifier": ttype_path}
+        task_models = {}
+        for name, path in paths.items():
+            if name == "TGradeBCEClassifier":
+                classifier = TGradeBCEClassifier()
+            elif name == "TTypeBCEClassifier":
+                classifier = TTypeBCEClassifier()
+            classifier = classifier.to(device)
+
+            network = ResNetClassifierNetwork(num_classes=classifier.num_classes
+                                                , resnet_version="resnet18")
+            
+            network = network.to(device)
+            classifier.set_network(network)
+            classifier.load_state_dict(torch.load(path, map_location=device))
+            for param in classifier.parameters():
+                param.requires_grad = False
+            task_models[name] = classifier
+
+        def apply_task_models(x):
+            first_output = task_models["TGradeBCEClassifier"](x)
+            second_output = task_models["TTypeBCEClassifier"](x)
+            return torch.cat((first_output, second_output), dim=1)
+        return apply_task_models
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
@@ -70,15 +108,18 @@ if __name__ == '__main__':
     fixed_state_dict = {'module.' + k: v for k, v in state_dict.items()}
     model.netG.load_state_dict(fixed_state_dict)
 
-    state_dict = torch.load(opt.model_d_path, map_location=torch.device(model.device))
-    fixed_state_dict = {'module.' + k: v for k, v in state_dict.items()}
-    model.netD.load_state_dict(fixed_state_dict)
+    if opt.model_d_path:
+        state_dict = torch.load(opt.model_d_path, map_location=torch.device(model.device))
+        fixed_state_dict = {'module.' + k: v for k, v in state_dict.items()}
+        model.netD.load_state_dict(fixed_state_dict)
 
     model.setup(opt)
     total_iters = 0
 
-    classifier = torch.load(opt.classifier_path, map_location=torch.device(model.device))
-    fairness_loss = ChexFairnessLoss(classifier)
+    tum = opt.tum
+
+    classifier_models = load_classifier_models(opt.dataset_mode, tum, model.device)
+    fairness_loss = FairnessLoss(classifier_models, opt.fairness_lambda)
     fairness_loss.to(model.device)
 
     model.fairness_loss = fairness_loss
