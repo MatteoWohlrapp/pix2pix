@@ -34,7 +34,7 @@ from fairness.resnet_classification_network import ResNetClassifierNetwork
 
 def load_classifier_models(dataset_mode, tum, device):
     if dataset_mode == "chex":
-        classifier_path = "" if tum else "/lotterlab/users/matteo/code/torchxrayvision/output/class_norm01/chex-densenet-class_norm01-best.pt"
+        classifier_path = "/vol/miltank/projects/practical_SoSe24/mri_inr/matteo/code/torchxrayvision/chex-densenet-class_norm01-best.pt" if tum else "/lotterlab/users/matteo/code/torchxrayvision/output/class_norm01/chex-densenet-class_norm01-best.pt"
         classifier = torch.load(classifier_path, map_location=device)
         for param in classifier.parameters():
             param.requires_grad = False

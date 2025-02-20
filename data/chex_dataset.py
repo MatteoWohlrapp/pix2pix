@@ -165,28 +165,22 @@ class ChexDataset(BaseDataset):
     def __len__(self):
         return len(self.metadata_A)
 
-    def compute_sample_weights(self):
-        """
-        Computes weights for each sample in the dataset based on the frequency 
-        of the combination of sensitive attributes (sex, age, race).
+    def compute_sample_weights(dataset):
+        # Get the metadata DataFrame; assuming self.metadata_A is used
+        df = dataset.metadata_A.copy()
         
-        Args:
-            dataset (Dataset): An instance of ChexDataset.
-            
-        Returns:
-            List[float]: A list of weights for each sample.
-        """
-        group_counts = {}
-        group_keys = []
-
-        # Iterate over the dataset to record each sample's sensitive attribute group
-        for idx in range(self.__len__()):
-            _, _, protected_attrs, _ = self[idx]
-            # Convert tensor to tuple to use as dict key
-            group = tuple(protected_attrs.tolist())
-            group_keys.append(group)
-            group_counts[group] = group_counts.get(group, 0) + 1
-
-        # Assign weight = 1 / (group frequency)
-        weights = [1.0 / group_counts[group] for group in group_keys]
-        return weights
+        # Use the sensitive columns directly, e.g., 'Sex', 'Age', 'Mapped_Race'
+        # Adjust the column names as necessary.
+        sensitive_cols = ['Sex', 'Age', 'Mapped_Race']
+        
+        # Group by sensitive attributes and count frequency
+        group_counts = df.groupby(sensitive_cols).size().reset_index(name='count')
+        
+        # Merge the count back to the DataFrame on the sensitive columns
+        df = df.merge(group_counts, on=sensitive_cols, how='left')
+        
+        # Create a weights array: inverse of the count
+        weights = 1.0 / df['count']
+        
+        # Convert to list (or a numpy array) so it matches the order of samples in the dataset
+        return weights.tolist()
