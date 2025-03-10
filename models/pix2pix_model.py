@@ -70,6 +70,11 @@ class Pix2PixModel(BaseModel):
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
 
+            # Initialize running averages for loss normalization
+            self.running_l1_loss = 0.0
+            self.running_fairness_loss = 0.0
+            self.loss_momentum = 0.96  # Control how much history to keep
+
     def set_input(self, input):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
 
@@ -109,10 +114,27 @@ class Pix2PixModel(BaseModel):
         fake_AB = torch.cat((self.real_A, self.fake_B), 1)
         pred_fake = self.netD(fake_AB)
         self.loss_G_GAN = self.criterionGAN(pred_fake, True)
-        # Second, G(A) = B
-        self.loss_G_L1 = self.criterionL1(self.fake_B, self.real_B) * self.opt.lambda_L1
-        self.loss_G_fairness = self.fairness_loss(self.fake_B, self.labels, self.protected_attrs)
-
+        
+        # Calculate raw L1 and fairness losses
+        raw_l1_loss = self.criterionL1(self.fake_B, self.real_B)
+        raw_fairness_loss = self.fairness_loss(self.fake_B, self.labels, self.protected_attrs)
+        
+        # Update running averages
+        self.running_l1_loss = self.loss_momentum * self.running_l1_loss + (1 - self.loss_momentum) * raw_l1_loss.item()
+        self.running_fairness_loss = self.loss_momentum * self.running_fairness_loss + (1 - self.loss_momentum) * raw_fairness_loss.item()
+        
+        # Normalize the losses to have similar magnitudes
+        if self.running_fairness_loss > 0 and self.running_l1_loss > 0:
+            l1_weight = 1.0
+            fairness_weight = (self.running_l1_loss / self.running_fairness_loss)
+        else:
+            l1_weight = 1.0
+            fairness_weight = 1.0
+        
+        # Apply weights and scaling factors
+        self.loss_G_L1 = raw_l1_loss * self.opt.lambda_L1 * l1_weight
+        self.loss_G_fairness = raw_fairness_loss * fairness_weight
+        
         # combine loss and calculate gradients
         self.loss_G = self.loss_G_GAN + self.loss_G_L1 + self.loss_G_fairness
         self.loss_G.backward()
