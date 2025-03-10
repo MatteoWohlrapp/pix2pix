@@ -106,7 +106,7 @@ class UcsfDataset(BaseDataset):
         )
         return complex_tensor
 
-    def create_radial_mask(self, shape, num_rays=140):
+    def create_radial_mask(self, shape, num_rays=60):
         """Create a radial mask for undersampling k-space."""
         H, W = shape
         center = (H // 2, W // 2)
@@ -229,27 +229,20 @@ class UcsfDataset(BaseDataset):
 
 
     def compute_sample_weights(self):
-        """
-        Computes weights for each sample in the dataset based on the frequency 
-        of the combination of sensitive attributes (sex, age, race).
+
+        df = self.metadata.clone()  # or dataset.metadata if you don't mind modifying it
         
-        Args:
-            dataset (Dataset): An instance of ChexDataset.
-            
-        Returns:
-            List[float]: A list of weights for each sample.
-        """
-        group_counts = {}
-        group_keys = []
-
-        # Iterate over the dataset to record each sample's sensitive attribute group
-        for idx in range(self.__len__()):
-            _, _, protected_attrs, _ = self[idx]
-            # Convert tensor to tuple to use as dict key
-            group = tuple(protected_attrs.tolist())
-            group_keys.append(group)
-            group_counts[group] = group_counts.get(group, 0) + 1
-
-        # Assign weight = 1 / (group frequency)
-        weights = [1.0 / group_counts[group] for group in group_keys]
-        return weights
+        # Define the sensitive columns. For example, here we use 'sex' and 'age_at_mri'
+        sensitive_cols = ['sex', 'age_at_mri']
+        
+        # Compute group counts using Polars
+        group_counts = df.group_by(sensitive_cols).agg(pl.count()).rename({'count': 'group_count'})
+        
+        # Join the group counts back to the original dataframe
+        df = df.join(group_counts, on=sensitive_cols, how='left')
+        
+        # Compute the weight as the inverse of the group_count
+        weights = 1.0 / df['group_count']
+        
+        # Return as a list
+        return weights.to_list()
