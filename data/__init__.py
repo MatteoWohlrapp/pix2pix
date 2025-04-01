@@ -79,7 +79,8 @@ class CustomDatasetDataLoader():
             batch_size=opt.batch_size,
             shuffle=False,
             num_workers=int(opt.num_threads),
-            sampler=WeightedRandomSampler(weights, len(weights), replacement=True))
+            sampler=WeightedRandomSampler(weights, len(weights), replacement=True)
+        )
 
     def load_data(self):
         return self

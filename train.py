@@ -119,11 +119,11 @@ if __name__ == '__main__':
     tum = opt.tum
 
     classifier_models = load_classifier_models(opt.dataset_mode, tum, model.device)
-    fairness_loss = FairnessLoss(classifier_models, opt.fairness_lambda)
-    fairness_loss.to(model.device)
+    #fairness_loss = FairnessLoss(classifier_models, opt.fairness_lambda)
+    #fairness_loss.to(model.device)
 
-    model.fairness_loss = fairness_loss
-    model.lambda_fairness = opt.lambda_fairness
+    #model.fairness_loss = fairness_loss
+    #model.lambda_fairness = opt.lambda_fairness
 
     for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
         epoch_start_time = time.time()

@@ -44,7 +44,7 @@ class Pix2PixModel(BaseModel):
         """
         BaseModel.__init__(self, opt)
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
-        self.loss_names = ['G_GAN', 'G_L1', 'D_real', 'D_fake', 'G_fairness']
+        self.loss_names = ['G_GAN', 'G_L1', 'D_real', 'D_fake']
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         self.visual_names = ['real_A', 'fake_B', 'real_B']
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
@@ -117,26 +117,12 @@ class Pix2PixModel(BaseModel):
         
         # Calculate raw L1 and fairness losses
         raw_l1_loss = self.criterionL1(self.fake_B, self.real_B)
-        raw_fairness_loss = self.fairness_loss(self.fake_B, self.labels, self.protected_attrs)
-        
-        # Update running averages
-        self.running_l1_loss = self.loss_momentum * self.running_l1_loss + (1 - self.loss_momentum) * raw_l1_loss.item()
-        self.running_fairness_loss = self.loss_momentum * self.running_fairness_loss + (1 - self.loss_momentum) * raw_fairness_loss.item()
-        
-        # Normalize the losses to have similar magnitudes
-        if self.running_fairness_loss > 0 and self.running_l1_loss > 0:
-            l1_weight = 1.0
-            fairness_weight = (self.running_l1_loss / self.running_fairness_loss)
-        else:
-            l1_weight = 1.0
-            fairness_weight = 1.0
         
         # Apply weights and scaling factors
-        self.loss_G_L1 = raw_l1_loss * self.opt.lambda_L1 * l1_weight
-        self.loss_G_fairness = raw_fairness_loss * fairness_weight
+        self.loss_G_L1 = raw_l1_loss * self.opt.lambda_L1 
         
         # combine loss and calculate gradients
-        self.loss_G = self.loss_G_GAN + self.loss_G_L1 + self.loss_G_fairness
+        self.loss_G = self.loss_G_GAN + self.loss_G_L1
         self.loss_G.backward()
 
     def optimize_parameters(self):
