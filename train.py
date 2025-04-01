@@ -65,7 +65,9 @@ def load_classifier_models(dataset_mode, tum, device):
             first_output = task_models["TGradeBCEClassifier"](x)
             second_output = task_models["TTypeBCEClassifier"](x)
             return torch.cat((first_output, second_output), dim=1)
-        return apply_task_models
+        #return apply_task_models
+        return task_models["TTypeBCEClassifier"].network
+        
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
@@ -119,7 +121,7 @@ if __name__ == '__main__':
     tum = opt.tum
 
     classifier_models = load_classifier_models(opt.dataset_mode, tum, model.device)
-    fairness_loss = FairnessLoss(classifier_models, opt.fairness_lambda)
+    fairness_loss = FairnessLoss(classifier_models, opt.fairness_lambda, device=model.device)
     fairness_loss.to(model.device)
 
     model.fairness_loss = fairness_loss

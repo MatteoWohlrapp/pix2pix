@@ -181,7 +181,7 @@ class UcsfDataset(BaseDataset):
         age = float(row["age_at_mri"] <= 58)
 
         grade = float(0 if int(row["who_cns_grade"]) <= 3 else 1)
-        type = float(1 if row["final_diagnosis"] == "Glioblastoma, IDH-wildtype" else 0)
+        ttype = float(1 if row["final_diagnosis"] == "Glioblastoma, IDH-wildtype" else 0)
         
         # Return in CycleGAN format but using your file paths
         return {
@@ -189,7 +189,7 @@ class UcsfDataset(BaseDataset):
             'B': slice_tensor,         # fully sampled image
             'A_paths': str(row["file_path"]),
             'B_paths': str(row["file_path"]),
-            'labels': torch.tensor([grade, type]),
+            'labels': torch.tensor([ttype]),
             'protected_attrs': torch.tensor([sex, age])
         }
 
