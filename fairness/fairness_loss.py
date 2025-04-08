@@ -14,7 +14,7 @@ class BiasPredictor(nn.Module):
         return x.squeeze(-1)
 
 class FairnessLoss(nn.Module):
-    def __init__(self, classifier, momentum=0.1, device=None):
+    def __init__(self, classifier, momentum=0.1, device=None, learning_rate=1e-4):
         super(FairnessLoss, self).__init__()
         self.classifier = classifier
         self.momentum = momentum
@@ -27,6 +27,10 @@ class FairnessLoss(nn.Module):
         
         # Initialize bias predictor to None - we'll create it with the correct dimensions on first forward pass
         self.bias_predictor = None
+        
+        # Add optimizer - will be initialized when bias_predictor is created
+        self.optimizer = None
+        self.learning_rate = learning_rate
 
         # Initialize running averages for normalization
         self.register_buffer("running_ce_avg", torch.tensor(1.0))
@@ -38,14 +42,14 @@ class FairnessLoss(nn.Module):
         # Ensure inputs are valid (no NaN or Inf)
         if torch.isnan(predictions).any() or torch.isnan(targets).any() or \
            torch.isinf(predictions).any() or torch.isinf(targets).any():
-            return torch.tensor(0.0, device=predictions.device)
+            return torch.tensor(0.0, device=predictions.device, requires_grad=True)
             
         vx = predictions - predictions.mean()
         vy = targets - targets.mean()
         
         # Check for zero division
         if torch.sum(vx ** 2).item() < self.eps or torch.sum(vy ** 2).item() < self.eps:
-            return torch.tensor(0.0, device=predictions.device)
+            return torch.tensor(0.0, device=predictions.device, requires_grad=True)
             
         corr = torch.sum(vx * vy) / (torch.sqrt(torch.sum(vx ** 2) * torch.sum(vy ** 2)) + self.eps)
         return corr ** 2
@@ -58,12 +62,13 @@ class FairnessLoss(nn.Module):
         if features.dim() > 2:
             features = features.reshape(features.size(0), -1)
         
-        # Initialize the bias predictor with the correct feature dimension if not already created
+        # Initialize bias predictor and its optimizer if not already created
         if self.bias_predictor is None:
             feature_dim = features.size(1)
             self.bias_predictor = BiasPredictor(feature_dim)
             if self.device is not None:
                 self.bias_predictor.to(self.device)
+            self.optimizer = torch.optim.Adam(self.bias_predictor.parameters(), lr=self.learning_rate)
             print(f"Initialized BiasPredictor with input dimension: {feature_dim}")
 
         # Classification loss
@@ -101,19 +106,27 @@ class FairnessLoss(nn.Module):
                 adv_loss = torch.tensor(0.0, device=features.device)
                 adv_loss_fe = torch.tensor(0.0, device=features.device)
             else:
-                # Apply bias predictor on all features first
-                bias_pred = self.bias_predictor(features.detach())
+                # First compute and update bias predictor using detached features
+                with torch.set_grad_enabled(True):
+                    bias_pred_detached = self.bias_predictor(features.detach())
+                    valid_bias_pred_detached = bias_pred_detached[valid_attr_mask]
+                    valid_protected = protected_attrs[valid_attr_mask, 0]
+                    
+                    # Make sure bias predictor parameters require gradients
+                    for param in self.bias_predictor.parameters():
+                        param.requires_grad = True
+                        
+                    adv_loss = self.correlation_loss(valid_bias_pred_detached, valid_protected)
+                
+                    # Only do backward if we have a valid loss with gradients
+                    if adv_loss.requires_grad and adv_loss.grad_fn is not None:
+                        self.optimizer.zero_grad()
+                        adv_loss.backward()
+                        self.optimizer.step()
+                
+                # Then compute adversarial loss for feature extractor with fresh computation
                 bias_pred_fe = self.bias_predictor(features)
-                
-                # Filter out valid entries for loss computation
-                valid_bias_pred = bias_pred[valid_attr_mask]
                 valid_bias_pred_fe = bias_pred_fe[valid_attr_mask]
-                
-                # Use first column for correlation calculation, but only from rows that are fully valid
-                valid_protected = protected_attrs[valid_attr_mask, 0]
-                
-                # Compute adversarial losses
-                adv_loss = self.correlation_loss(valid_bias_pred, valid_protected)
                 adv_loss_fe = -self.correlation_loss(valid_bias_pred_fe, valid_protected)
 
         # Update running averages
@@ -122,9 +135,7 @@ class FairnessLoss(nn.Module):
 
         # Normalize losses
         norm_ce_loss = ce_loss / (self.running_ce_avg + self.eps)
-        norm_adv_loss = adv_loss_fe / (self.running_adv_avg + self.eps)
+        norm_adv_loss_fe = adv_loss_fe / (self.running_adv_avg + self.eps)
 
-        # Combine losses
-        total_loss = norm_ce_loss + norm_adv_loss
-
-        return total_loss
+        # Return loss for reconstruction model
+        return norm_ce_loss + norm_adv_loss_fe
