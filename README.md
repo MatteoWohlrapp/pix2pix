@@ -5,7 +5,7 @@ This repository is forked and adjusted for our project on fair image reconstruct
 
 ### Branches Overview
 
-- **main**: Base implementation with normal reconstruction adapted to handle CheXpert and UCSF-PDGM datasets.
+- **master**: Base implementation with normal reconstruction adapted to handle CheXpert and UCSF-PDGM datasets.
   
 - **reweighting**: Implementation of undersampling/oversampling based on sensitive attributes to mitigate bias.
   
