@@ -1,4 +1,18 @@
 
+## Fork Information
+
+This repository is forked and adjusted for our project on fair image reconstruction. We have extended the original codebase to work with medical imaging datasets including CheXpert and UCSF-PDGM.
+
+### Branches Overview
+
+- **main**: Base implementation with normal reconstruction adapted to handle CheXpert and UCSF-PDGM datasets.
+  
+- **reweighting**: Implementation of undersampling/oversampling based on sensitive attributes to mitigate bias.
+  
+- **eodd**: Implementation with equalized odds constraint for fair reconstruction.
+  
+- **adversarial**: Implementation using an adversarial approach similar to fairness through unawareness.
+
 <img src='imgs/horse2zebra.gif' align="right" width=384>
 
 <br><br><br>
